@@ -1,0 +1,227 @@
+#include "udp.h"
+
+UDP::UDP(QWidget *parent)
+	: QMainWindow(parent)
+{
+	IpLength = sizeof(serverAddr);
+	recordFile.open("record.txt", ios::app);//打开以追加方式记录聊天记录的文件
+	ui.setupUi(this);
+	ui.appointIpEdit->setText("<font color=gray>" + QString::fromStdString("Please input IP here")  + "</font>");
+	ui.dialogEdit -> installEventFilter(this);
+	ui.MyIpLabel->tr("hello world");
+	GetNameAndIp();
+	findMyIp();
+	QObject::connect(ui.sendButton, SIGNAL(clicked()), this, SLOT(flushTextView()));
+	QObject::connect(ui.flushButton, SIGNAL(clicked()), this, SLOT(GetNameAndIp()));
+	QObject::connect(ui.IpListWidget, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(getClickedIp(QListWidgetItem*)));
+	QObject::connect(ui.appointIpButton, SIGNAL(clicked()), this, SLOT(getAppointIp()));
+
+	QTextCodec::setCodecForLocale(QTextCodec::codecForName("system"));
+
+	//建立客户端服务器
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+	{
+		ui.dialogBrowser->append("Failed to load Winsock");
+	}
+	sserver = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	sclient = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (sserver == INVALID_SOCKET)
+	{
+		ui.dialogBrowser->append("socket()Failed：" + WSAGetLastError());
+	}
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_port = htons(port);
+	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
+
+	clientAddr.sin_family = AF_INET;
+	clientAddr.sin_port = htons(port);
+	//clientAddr.sin_addr.S_un.S_addr = inet_addr(chatIp.c_str());
+	//setsockopt(sclient, SOL_SOCKET, SO_BROADCAST, (CHAR *)&fBroadcast, sizeof(BOOL));
+	if(bind(sserver, (sockaddr*)&serverAddr, sizeof(serverAddr)) != 0)
+		ui.dialogBrowser->append("bind failed");
+}
+
+UDP::~UDP()
+{
+
+}
+
+void UDP::flushTextView() 
+//刷新输入框
+{
+	lastTime = time.wMinute;
+	QString input = ui.dialogEdit->toPlainText();
+	if (input.length() != 0 && sendAble) 
+	{
+		GetLocalTime(&time);
+		ss << " "<< time.wYear << "\\" << time.wMonth << "\\" << time.wDay << " " << time.wHour << ":" << time.wMinute << ":" << time.wSecond;
+		ui.dialogBrowser->append("<font color=gray>" + QString::fromStdString(ss.str()) + "</font>");
+		ui.dialogBrowser->append("<font color=blue>" + input + "</font>");
+		recordFile << "本机 to " + chatIp + "  " << ss.str() + "  " << input.toStdString() << endl;//记录到本地
+		ss.str("");
+		//发送给联系人服务器
+		const char* send_buf = input.toStdString().c_str();
+
+		clientAddr.sin_addr.S_un.S_addr = inet_addr(chatIp.c_str());
+		//ui.dialogBrowser->append(QString::fromStdString(chatIp));
+		send = sendto(sserver, send_buf, sizeof(send_buf), 0, (struct sockaddr*)&clientAddr, sizeof(clientAddr));
+
+		if(send == -1)
+			ui.dialogBrowser->append("send failed" + WSAGetLastError());
+		ui.dialogEdit->clear();
+	}
+}
+
+void UDP::receiveFromServer() {
+	//从对方接收数据
+	receive = recvfrom(sserver, receiveData, 1000, 0, (struct sockaddr*)&clientAddr, &IpLength);
+	if (receive == 0) {
+		ui.dialogBrowser->append("receive failed");
+	}
+	else if (receive == SOCKET_ERROR) {
+		//ui.dialogBrowser->append("receive error");
+	}
+	else {
+		GetLocalTime(&time);
+		ss << " " << time.wYear << "\\" << time.wMonth << "\\" << time.wDay << " " << time.wHour << ":" << time.wMinute << ":" << time.wSecond;
+		ui.dialogBrowser->append("<font color=gray>" + QString::fromStdString(ss.str()) + "</font>");
+		ui.dialogBrowser->append("<font color=red>" + QString::fromStdString(receiveData) + "</font>");
+		recordFile << chatIp + " to 本机" + "  " << ss.str() + "  " << receiveData << endl;//记录到本地
+		ss.str("");
+	}
+}
+
+bool UDP::eventFilter(QObject *obj, QEvent *e)
+{
+	Q_ASSERT(obj == ui.dialogEdit);
+	if (e->type() == QEvent::KeyPress)
+	{
+		QKeyEvent *event = (QKeyEvent*)(e);
+		if (event->key() == Qt::Key_Return && (event->modifiers() & Qt::ControlModifier))
+		{
+			flushTextView(); //发送消息的槽
+			return true;
+		}
+	}
+	return false;
+}
+
+void UDP::getClickedIp(QListWidgetItem* newly) {
+	//获取被点击的联系人
+	if (sendAble && appointFlag) {
+		old->setBackgroundColor(Qt::white);
+		old->setTextColor(Qt::black);
+	}
+	newly->setBackgroundColor(Qt::yellow);
+	newly->setTextColor(Qt::red);
+	old = newly;
+	sendAble = true;
+	ui.chatIpLabel->setText(newly->text() + ": " + QString::fromStdString(names[newly->text().toStdString()]));
+	chatIp = names[newly->text().toStdString()];
+	serverAddr.sin_addr.S_un.S_addr = inet_addr(newly->text().toStdString().c_str());
+	appointFlag = true;
+}
+
+void UDP::findMyIp() {
+//获取本机IP
+	WORD v = MAKEWORD(1, 1);
+	WSADATA wsaData;
+	WSAStartup(v, &wsaData); // 加载套接字库  
+
+	struct hostent *phostinfo = gethostbyname("");
+	myIp = inet_ntoa(*((struct in_addr *)(*phostinfo->h_addr_list)));
+	ui.MyIpLabel->setText(QString::fromStdString(phostinfo->h_name) + ": " + QString::fromStdString(myIp));
+	WSACleanup();
+}
+
+void UDP::GetNameAndIp()
+//获取局域网所有联系人的主机名称和IP
+{
+
+	struct   hostent   *host;
+	struct   in_addr   *ptr;
+
+	DWORD   dwScope = RESOURCE_CONTEXT;
+	NETRESOURCE   *NetResource = NULL;
+	HANDLE   hEnum;
+	WNetOpenEnum(dwScope, NULL, NULL, NULL, &hEnum);
+
+	WSADATA   wsaData;
+	WSAStartup(MAKEWORD(1, 1), &wsaData);
+	ui.IpListWidget->clear();//清空列表
+	names.clear();//清空map
+	ui.chatIpLabel->setText("");//清除当前联系人
+	sendAble = false;
+	appointFlag = false;
+
+	if (hEnum)
+	{
+		DWORD   Count = 0xFFFFFFFF;
+		DWORD   BufferSize = 10240;
+		LPVOID   Buffer = new char[10240];
+		WNetEnumResource(hEnum, &Count, Buffer, &BufferSize);
+		NetResource = (NETRESOURCE*)Buffer;
+
+		char szHostName[200];
+
+		for (unsigned int i = 0; i < BufferSize / sizeof(NETRESOURCE); i++, NetResource++)
+		{
+			if (NetResource->dwUsage == RESOURCEUSAGE_CONTAINER && NetResource->dwType == RESOURCETYPE_ANY)
+			{
+				if (NetResource->lpRemoteName)
+				{
+					CString   strFullName = NetResource->lpRemoteName;
+					if (0 == strFullName.Left(2).Compare(_T("\\\\")))
+						strFullName = strFullName.Right(strFullName.GetLength() - 2);
+
+					gethostname(szHostName, strlen(szHostName));
+					USES_CONVERSION;
+					char *pchar = T2A(strFullName);
+					host = gethostbyname(pchar);
+
+					if (host == NULL)   continue;
+					ptr = (struct in_addr *)   host->h_addr_list[0];
+
+					string str = "";
+					for (int n = 0; n < 4; n++)
+					{
+						CString addr;
+						if (n > 0)
+						{
+							str += ".";
+						}
+						int value = (unsigned int)((unsigned char*)host->h_addr_list[0])[n];
+						char p[20];
+						sprintf(p, "%d", value);
+						str.append(p);
+					}
+					names.insert(pair<string, string>(host->h_name, str));//加入map
+					ui.IpListWidget->addItem(QString::fromStdString(host->h_name));//显示主机名称
+					//std::cout << "IP:" << str << " Name:" << host->h_name << std::endl;
+				}
+			}
+		}
+		delete   Buffer;
+		WNetCloseEnum(hEnum);
+	}
+	WSACleanup();
+}
+
+void UDP::loop() {
+	while(true){
+		Sleep(1000);
+		receiveFromServer();
+	}
+}
+
+void UDP::getAppointIp() {
+	chatIp = ui.appointIpEdit->toPlainText().toStdString();
+	ui.chatIpLabel->setText("Talking with: " + ui.appointIpEdit->toPlainText());
+	if (appointFlag) {
+		old->setBackground(Qt::white);
+		old->setTextColor(Qt::black);
+		ui.IpListWidget->clearSelection();
+		appointFlag = false;
+	}
+	sendAble = true;
+}
