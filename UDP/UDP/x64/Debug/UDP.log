@@ -1,2 +1,6 @@
-﻿  udp.cpp
+﻿  Moc'ing udp.h...
+  moc_udp.cpp
+  main.cpp
+  udp.cpp
+  正在生成代码...
   UDP.vcxproj -> D:\Qt\UDP\x64\Debug\UDP.exe

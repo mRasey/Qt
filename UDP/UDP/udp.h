@@ -11,15 +11,17 @@
 #include <QKeyEvent>
 #include <string.h>
 #include <atlstr.h>
+#include <locale>
 //#include <WinSock2.h>
 #include <winnetwk.h>
 #include <map>
+#include <thread>
 #include "ui_udp.h"
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "mpr.lib")
 
-using namespace std;
+//using namespace std;
 
 class UDP : public QMainWindow
 {
@@ -40,26 +42,28 @@ public:
 	SYSTEMTIME time;
 	int oldTime;
 	int lastTime;
-	ostringstream ss;
-	string t;
-	map<string, string> names;
-	string chatIp;
-	string myIp;
+	std::ostringstream ss;
+	std::string t;
+	std::map<std::string, std::string> names;
+	std::string chatIp;
+	std::string myIp;
 	QListWidgetItem* old;
 //	bool flag = FALSE;
 	bool sendAble = false;//是否允许发送消息
 	bool appointFlag = false;
-	int port = 7001;
+	int port = 8008;
 	WSADATA wsaData;
 	SOCKET sserver, sclient;
 	int IpLength;
 	int send;
 	int receive;
-	char* receiveData;
+	char receiveData[1024] = {'\0'};
+	char sendData[1024] = {'\0'};
+	int dataLen = 1024;
 	bool fBroadcast = TRUE;
-	string sendMassege;//发出的信息
-	struct sockaddr_in  serverAddr, clientAddr;
-	ofstream recordFile;
+	std::string sendMassege;//发出的信息
+	struct sockaddr_in  serverAddr, clientAddr, assistAddr;
+	std::ofstream recordFile;
 
 private slots:
 	void GetNameAndIp(); 

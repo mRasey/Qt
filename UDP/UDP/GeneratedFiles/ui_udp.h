@@ -80,7 +80,7 @@ public:
         appointIpButton->setGeometry(QRect(520, 300, 71, 41));
         appointIpEdit = new QTextEdit(centralWidget);
         appointIpEdit->setObjectName(QStringLiteral("appointIpEdit"));
-        appointIpEdit->setGeometry(QRect(440, 30, 151, 21));
+        appointIpEdit->setGeometry(QRect(440, 30, 171, 21));
         pushButton = new QPushButton(centralWidget);
         pushButton->setObjectName(QStringLiteral("pushButton"));
         pushButton->setGeometry(QRect(506, 300, 20, 41));

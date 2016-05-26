@@ -50,9 +50,6 @@
     <ClCompile Include="GeneratedFiles\qrc_udp.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="MyThread.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="udp.h">
@@ -69,11 +66,11 @@
     <ClInclude Include="GeneratedFiles\ui_udp.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
-    <ClInclude Include="MyThread.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="exe.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="readme.docx" />
   </ItemGroup>
 </Project>
