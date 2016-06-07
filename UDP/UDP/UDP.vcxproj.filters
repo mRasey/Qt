@@ -70,7 +70,4 @@
   <ItemGroup>
     <ResourceCompile Include="exe.rc" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="readme.docx" />
-  </ItemGroup>
 </Project>
